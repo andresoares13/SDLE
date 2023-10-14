@@ -31,7 +31,7 @@ def create_user():
 
     return "User created on the server"
 
-@app.route('/login', methods=['POST'])
+@app.route('/log_in', methods=['POST'])
 def login():
     data = request.get_json()
     username = data['name']
@@ -61,6 +61,21 @@ def add_user_route():
     db.commit()
 
     return "User added on the server", 200
+
+@app.route('/deleteUser', methods=['POST'])
+def delete_user():
+    data = request.get_json()
+    username = data['username']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM User WHERE name = ?", (username,))
+        conn.commit()
+        conn.close()
+        return "User deleted", 200  # Return a success response
+    except:
+        return "User not found", 404  # Return a not found response if the user is not found
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
