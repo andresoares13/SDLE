@@ -10,7 +10,11 @@
 <body>
     <div class="container mt-5">
      
-	{% if not user %}
+	{% if message %}
+    <div class="alert alert-danger" role="alert">
+        {{ message }}
+    </div>
+    {% endif %}
         <h1>Add User</h1>
         <form method="POST" action="/add_user">
             <div class="form-group">
@@ -23,11 +27,10 @@
             </div>
             <button type="submit" class="btn btn-primary">Add User</button>
         </form>
-        {% endif %}
+
         
-        {% if user %}
+
         <h1> Log In </h1>
-        <h2>Stored User: {{ user }}</h2>
         <form method="POST" action="/log_in" class="mt-4">
 	    <div class="form-group">
 		<label for="username">Username:</label>
@@ -39,7 +42,17 @@
 	    </div>
 	    <button type="submit" class="btn btn-primary" id="loginButton">Login</button>
 	</form>
-	{% endif %}
+	<h2>Stored Users:</h2>
+    <ul>
+        {% if users %}
+            {% for user in users %}
+                <li>{{ user }}</li>
+            {% endfor %}
+        {% else %}
+            <li>No users yet</li>
+        {% endif %}
+    </ul>
+
     </div>
     
     <!-- Include Bootstrap JavaScript and jQuery (optional) -->

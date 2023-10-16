@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>List Page</title>
+    <!-- Include Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+    {% if message %}
+    <div class="alert alert-success" role="alert">
+        {{ message }}
+    </div>
+    {% endif %}
+    
+    <div class="d-flex justify-content-end mt-3">
+        <form method="POST" action="/deleteList">
+    <input type="hidden" name="key" id="keyInput">
+    <input type="hidden" name="name" id="nameInput">
+    <button type="submit" class="btn btn-danger mr-2">Delete List</button>
+</form>
+
+    </div>
+        <h1>List Details</h1>
+
+        <!-- Display the list details (you can customize this part as needed) -->
+        <p id="nameParagraph"><strong>Name:</strong> {{ list[0] }}</p>
+        <p><strong>Share:</strong> {{ list[1] }}</p>
+
+        <!-- Button to go back to the User Page -->
+        <a href="{{ url_for('user_page') }}" class="btn btn-primary">User Page</a>
+    </div>
+    
+    <!-- Include Bootstrap JavaScript and jQuery (optional) -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script defer>
+    	var url = new URL(window.location.href);
+    	var key = url.searchParams.get("key");
+    	var nameParagraph = document.getElementById("nameParagraph");
+    	var name = nameParagraph.textContent.split(': ')[1].trim();
+    	document.getElementById("nameInput").value = name;
+    	document.getElementById("keyInput").value = key;
+    
+    </script>
+</body>
+</html>
+
