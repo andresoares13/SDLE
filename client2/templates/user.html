@@ -21,11 +21,9 @@
     {% endif %}
     
     <div class="d-flex justify-content-end mt-3">
-    	{% if connected %}
-    <form method="POST" action="/connectToCloud">
-        <button type="submit" class="btn btn-success">Connect to Cloud</button>
-    </form>
-    {% endif %}
+	<form method="POST" action="/sync">
+          <button type="submit" class="btn btn-success mr-2">Sync with cloud</button>
+    	</form>
     	
         <form method="POST" action="/logout">
             <button type="submit" class="btn btn-danger mr-2">Logout</button>
@@ -71,7 +69,11 @@
 		<div class="card">
 		    <div class="card-body" style="color: #000 !important;">
 		        <h5 class="card-title">{{ item[0] }}</h5>
-		        <p class="card-text">Share: {{ item[1] }}</p>
+		        {% if item[2] == 1 %}
+			<p><strong>Share:</strong> {{ item[1] }}</p>
+			{% else %}
+			<p><strong>List has not been shared</strong></p>
+			{% endif %}
 		    </div>
 		</div>
 	    </a>

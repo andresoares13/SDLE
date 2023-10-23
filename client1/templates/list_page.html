@@ -16,22 +16,56 @@
     {% endif %}
     
     <div class="d-flex justify-content-end mt-3">
-        <form method="POST" action="/deleteList">
-    <input type="hidden" name="key" id="keyInput">
-    <input type="hidden" name="name" id="nameInput">
-    <button type="submit" class="btn btn-danger mr-2">Delete List</button>
-</form>
+    	<a href="{{ url_for('add_item_page', key=list[1]) }}" class="btn btn-primary mr-2">Add Items</a>
+    
+    	{% if list[2] == 0 %}
+        <form method="POST" action="/shareList">
+	    <input type="hidden" name="key" class="keyInput">
+	    <input type="hidden" name="name" class="nameInput">
+	    <button type="submit" class="btn btn-success mr-2">Share List</button>
+	</form>
+	{% endif %}
+	<form method="POST" action="/deleteList">
+	    <input type="hidden" name="key" class="keyInputD">
+	    <input type="hidden" name="name" class="nameInputD">
+	    <button type="submit" class="btn btn-danger mr-2">Delete List</button>
+	</form>
 
     </div>
         <h1>List Details</h1>
 
         <!-- Display the list details (you can customize this part as needed) -->
         <p id="nameParagraph"><strong>Name:</strong> {{ list[0] }}</p>
-        <p><strong>Share:</strong> {{ list[1] }}</p>
+        {% if list[2] == 1 %}
+	    <p><strong>Share:</strong> {{ list[1] }}</p>
+	{% else %}
+	    <p><strong>List has not been shared</strong></p>
+	{% endif %}
 
         <!-- Button to go back to the User Page -->
         <a href="{{ url_for('user_page') }}" class="btn btn-primary">User Page</a>
+        
+        
+        <div class="mt-4">
+        <h2>Items</h2>
+        <div class="row">
+            {% for item in items %}
+                <div class="col-md-4 mb-4">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h5 class="card-title"><strong>{{ item[1] }}</strong></h5>
+                            <p class="card-text">Quantity: {{ item[3] }}</p>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
     </div>
+        
+    </div>
+    
+    
+    
     
     <!-- Include Bootstrap JavaScript and jQuery (optional) -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
@@ -41,8 +75,13 @@
     	var key = url.searchParams.get("key");
     	var nameParagraph = document.getElementById("nameParagraph");
     	var name = nameParagraph.textContent.split(': ')[1].trim();
-    	document.getElementById("nameInput").value = name;
-    	document.getElementById("keyInput").value = key;
+    	if (document.getElementsByClassName("nameInput").length > 0){
+    		document.getElementsByClassName("nameInput")[0].value = name;
+    		document.getElementsByClassName("keyInput")[0].value = key;
+    	}
+    
+    	document.getElementsByClassName("nameInputD")[0].value = name;
+    	document.getElementsByClassName("keyInputD")[0].value = key;
     
     </script>
 </body>

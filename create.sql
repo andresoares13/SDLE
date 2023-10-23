@@ -9,6 +9,7 @@ CREATE TABLE User (
 CREATE TABLE List (
     id INTEGER PRIMARY KEY,
     name TEXT,
+    shared INTEGER DEFAULT 0,
     password TEXT UNIQUE
 );
 
@@ -17,7 +18,7 @@ CREATE TABLE Item (
     name TEXT,
     list_key INTEGER,
     quantity INTEGER,
-    FOREIGN KEY (list_key) REFERENCES List(password)
+    FOREIGN KEY (list_key) REFERENCES List(password) ON DELETE CASCADE
 );
 
 CREATE TABLE UserList (

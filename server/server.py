@@ -2,12 +2,15 @@ from flask import Flask, request, g, render_template
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 import requests
+import string
+import random
+import json
 
 app = Flask(__name__)
 
 DATABASE_FILE = "server.db"
 
-userPorts = {}
+
 
 # Function to get a new database connection
 def get_db():
@@ -38,12 +41,11 @@ def create_user():
     db.commit()
     return "User created on the server"
 
-@app.route('/log_in', methods=['POST'])
+@app.route('/sync', methods=['POST'])
 def login():
     data = request.get_json()
     username = data['name']
     password = data['password']
-    userPorts[username] = data['port']
     # Verify the user's credentials
     db = get_db()
     cursor = db.cursor()
@@ -60,8 +62,6 @@ def add_user_route():
     data = request.get_json()
     name = data['name']
     password = data['password']
-    userPorts[name] = data['port']
-    # Insert the user into the server's database
     try:
         db = get_db()
         cursor = db.cursor()
@@ -95,69 +95,79 @@ def add_list_route():
     password = data['key']
     user = data['user']
 
-    # Insert the user into the server's database
+    validKey = False
+
+    while not validKey:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT name,password FROM List where password = ?",(password,))
+        currentList = cursor.fetchone()
+        if not currentList:
+            validKey = True
+            break
+        else:
+            characters = string.ascii_uppercase + string.digits
+            password = ''.join(random.choice(characters) for _ in range(8))
+          
+
     try:
         db = get_db()
         cursor = db.cursor()
         cursor.execute("INSERT INTO List (name, password) VALUES (?, ?)", (name, password))
         cursor.execute("INSERT INTO UserList (name, list_key) VALUES (?, ?)", (user, password))
+        for item in data['items']:
+            cursor.execute("INSERT INTO Item (name, list_key, quantity) VALUES (?, ?, ?)", (item[1], item[2], item[3]))
         db.commit()
     finally:
         db.close()
 
-    return "List added on the server", 200
+    return password, 200
 
 
-def send_post_request(port,key):
-    try:
-        response = requests.post(f'http://localhost:{port}/deleteListServerRequest', json={'key': key})
-        if response.status_code == 200:
-            return True  # Request successful
-    except requests.exceptions.RequestException:
-        pass  # Handle request errors, if any
-    return False  # Request failed
-
-
-@app.route('/deleteList', methods=['POST'])
-def delete_list():
+@app.route('/requestUpdates',methods = ['POST'])
+def requestUpdates():
+    failed = False
     data = request.get_json()
-    key = data['key']
+    username = data['name']
+    port = data['port']
     conn = get_db()
     cursor = conn.cursor()
+    cursor.execute("SELECT * FROM ListDeleteUpdate WHERE username = ?",(username,))
+    listDeleteUpdates = cursor.fetchall()
+    for update in listDeleteUpdates:
+        response = requests.post(f'http://localhost:{port}/deleteListServerRequest', json={'key': update[1]})
+        if response.status_code != 200:
+            failed = True
 
+    if failed:
+        return "Failure",404
+    else:
+        return "Updated", 200
+
+@app.route('/deleteListUpdate', methods=['POST'])
+def addDeleteListUpdate():
+    data = request.get_json()
+    key = data['key']
+    username = data['name']
+    conn = get_db()
+    cursor = conn.cursor()
     try:
         cursor.execute("SELECT name FROM UserList WHERE list_key = ?",(key,))
         users = cursor.fetchall()
         for user in users:
-            print(user[0])
-            if user[0] not in userPorts:
-                print(userPorts)
-                try:
-                    db = get_db()
-                    cursor = db.cursor()
-                    cursor.execute("INSERT INTO ListDeleteUpdate (username, list_key) VALUES (?, ?)", (user[0], key))
-                    db.commit()
-                finally:
-                    cursor.close()
-        max_threads = len(userPorts) + 1
-        with ThreadPoolExecutor(max_threads) as executor:
-            results = list(executor.map(send_post_request, userPorts.values(),[key] * len(userPorts)))
-
-        print("he")
-        for username, result in zip(userPorts.keys(), results):
-            if not result:
-                db = get_db()
-                cursor = db.cursor()
-                cursor.execute("INSERT INTO ListDeleteUpdate (username, list_key) VALUES (?, ?)", (username, key))
-                db.commit()
+            if (user[0] != username):
+                print("l")
+                cursor.execute("INSERT INTO ListDeleteUpdate (username, list_key) VALUES (?, ?)", (user[0], key))
+        cursor.execute('PRAGMA foreign_keys = ON')
         cursor.execute("DELETE FROM List WHERE password = ?", (key,))
         conn.commit()
-        conn.close()
-        return "List deleted", 200  
-    except Exception as e:
-        print(e)
-        return "List not found", 404  
+    except:
+        return "Could not Update", 404
+    finally:
+        cursor.close()
     
+    return "List deleted", 200
+
 
     
 
@@ -176,6 +186,12 @@ def add_existingList_route():
         list = cursor.fetchone()
         if list:
             cursor.execute("INSERT INTO UserList (name, list_key) VALUES (?, ?)", (user, key))
+            cursor.execute("SELECT * FROM Item where list_key = ?",(key,))
+            rows = cursor.fetchall()
+            if not rows:
+                items = []
+            else:
+                items = [dict(row) for row in rows]
             db.commit()
             valid = True
             
@@ -183,7 +199,9 @@ def add_existingList_route():
         db.close()
 
     if valid:
-        return list[0], 200
+        response_data = {"list": list[0], "items": items}
+        response_json = json.dumps(response_data)
+        return response_json, 200
     else:
         return "List not found", 404 
     
