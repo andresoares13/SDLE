@@ -376,6 +376,42 @@ def add_item_page():
 
 
 
+@app.route('/delete_item', methods=['POST', 'GET'])
+def delete_item_page():
+    if 'username' not in session:
+        return redirect(url_for('index'))
+    
+    list_key = request.args.get('key')
+    
+    if request.method == 'POST':
+        key = request.form['key']
+        item = request.form['name']
+
+        try:
+            cursor = get_cursor()
+            cursor.execute("DELETE FROM Item WHERE name = ? and list_key = ?", (item, key))
+            get_db().commit()
+            session['message'] = 'Item deleted successfully!'
+            return redirect(url_for('list_page', key=key))
+        except Exception as e:
+            print(e)
+            session['message'] = 'Failed to delete item.'
+        finally:
+            cursor.close()
+
+
+    try:
+        cursor = get_cursor()
+        cursor.execute("SELECT name, password, shared FROM List where password = ?", (list_key,))
+        current_list = cursor.fetchone()
+    finally:
+        cursor.close()
+    
+    message = session.pop('message', '')
+    
+    return render_template('list_page.html',list=current_list,message=message,items=items)
+    
+
 
 if __name__ == '__main__':
     script_directory = os.path.dirname(os.path.abspath(__file__))
