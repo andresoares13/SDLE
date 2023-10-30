@@ -55,9 +55,30 @@
                         <div class="card-body text-center">
                             <h5 class="card-title"><strong>{{ item[1] }}</strong></h5>
                             <p class="card-text">Quantity: {{ item[3] }}</p>
+                            <!-- "Change Quantity" button -->
+                            <button class="btn btn-primary mr-2 mb-4" onclick="showUpdateForm(this)">Change Quantity</button>
+                            
+                            <!-- Form to update quantity (initially hidden) -->
+                            <form method="POST" action="/updateQuantity" class="update-form mb-4" style="display: none;">
+                                <div class="input-group mb-3 mr-2">
+                                    <div class="input-group-prepend">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="decrementQuantity(this)">-</button>
+                                    </div>
+                                    <input type="text" class="form-control quantity-input-narrow" name="quantity" 
+                                           value="{{ item[3] }}" min="0" max="10" style="width: 3em; text-align:center">
+                                    <div class="input-group-append">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="incrementQuantity(this)">+</button>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Update</button>
+                                <input type="hidden" name="item" value="{{ item[1] }}">
+                                <input type="hidden" name="old" value="{{ item[3] }}">
+                                <input type="hidden" name="key" value="{{ request.args.get('key') }}">
+                            </form>
                             <form method="POST" action="/delete_item">
                                 <input type="hidden" name="key" value="{{ request.args.get('key') }}" class="keyInputD">
                                 <input type="hidden" name="name" value="{{ item[1] }}" class="nameInputD">
+                                <input type="hidden" name="quantity" value="{{ item[3] }}">
                                 <button type="submit" class="btn btn-danger mr-2">Delete</button>
                             </form>
                         </div>
@@ -87,6 +108,23 @@
     
     	document.getElementsByClassName("nameInputD")[0].value = name;
     	document.getElementsByClassName("keyInputD")[0].value = key;
+    	
+    	function showUpdateForm(button) {
+        // Get the next sibling (form) of the clicked button and toggle its display
+        button.nextElementSibling.style.display = button.nextElementSibling.style.display === "none" ? "block" : "none";
+	}
+
+	function incrementQuantity(button) {
+	// Increment the value in the input element
+	let inputElement = button.parentElement.previousElementSibling;
+	inputElement.value = Math.min(parseInt(inputElement.value) + 1, 10);
+	}
+
+	function decrementQuantity(button) {
+	// Decrement the value in the input element
+	let inputElement = button.parentElement.nextElementSibling;
+	inputElement.value = Math.max(parseInt(inputElement.value) - 1, 1);
+	}
     
     </script>
 </body>

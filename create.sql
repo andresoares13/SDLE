@@ -30,8 +30,46 @@ CREATE TABLE UserList (
 
 CREATE TABLE ListDeleteUpdate(
     username TEXT,
-    list_key TEXT
+    list_key TEXT,
+    FOREIGN KEY (list_key) REFERENCES List(password) ON DELETE CASCADE,
+    FOREIGN KEY (username) REFERENCES User(name) ON DELETE CASCADE
 );
+
+CREATE TABLE ItemChangeUpdate(
+    username TEXT,
+    list_key TEXT,
+    item TEXT,
+    FOREIGN KEY (list_key) REFERENCES List(password) ON DELETE CASCADE,
+    FOREIGN KEY (username) REFERENCES User(name) ON DELETE CASCADE
+    
+);
+
+CREATE TABLE ItemIncreaseDict(
+    username TEXT,
+    list_key TEXT,
+    item TEXT,
+    quantity INTEGER,
+    FOREIGN KEY (list_key) REFERENCES List(password) ON DELETE CASCADE,
+    FOREIGN KEY (username) REFERENCES User(name) ON DELETE CASCADE
+);
+
+CREATE TABLE ItemDecreaseDict(
+    username TEXT,
+    list_key TEXT,
+    item TEXT,
+    quantity INTEGER,
+    FOREIGN KEY (list_key) REFERENCES List(password) ON DELETE CASCADE,
+    FOREIGN KEY (username) REFERENCES User(name) ON DELETE CASCADE
+);
+
+
+
+
+
+
+
+
+
     
     
     
