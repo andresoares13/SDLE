@@ -160,6 +160,51 @@ def add_user(name, password):
     else:
         return redirect(url_for('index'))
 
+@app.route('/add_existing_user', methods=['POST']) 
+def add_existing_user():
+    name = request.form['name']
+    password = request.form['password']
+    hashed_password = hash_password(password)
+    data = {'name': name, 'password': hashed_password}
+    response = requests.post(f"{SERVER_URL}/add_existing_user", json=data)
+    if response.status_code == 200:
+        response_data = json.loads(response.text)
+        lists = response_data["lists"]
+        cursor = get_cursor()
+        cursor.execute("INSERT INTO User (name, password) VALUES (?, ?)", (name, hashed_password))
+        get_db().commit()
+
+        cursor = get_cursor()
+        cursor.execute("SELECT * FROM User WHERE name = ? AND password = ?", (name, hashed_password))
+        user = cursor.fetchone()
+        session['username'] = name
+        session['id'] = str(user[0])
+        session['message'] = 'User Created'
+        session['hash'] = hashed_password
+        addedLists = True
+        for list in lists:
+            data = {'listKey': list}
+            response = requests.post(f"http://localhost:{port}/addExistingList", json=data)
+            if response.status_code != 200:
+                addedLists = False
+
+
+        if addedLists:
+            return redirect(url_for('user_page'))
+        else:
+            session['message'] = 'Error adding user' 
+            session.pop('username', None)
+            session.pop('id',None)
+            session.pop('hash',None)
+            cursor = get_cursor()
+            cursor.execute('PRAGMA foreign_keys = ON')
+            cursor.execute("DELETE FROM User WHERE name = ?", (name,))
+            get_db().commit()
+            return redirect(url_for('index'))
+    else:
+        session['message'] = 'User does not exist' 
+        return redirect(url_for('index'))
+
 
 
 def display_users():
@@ -424,7 +469,12 @@ def delete_list_serverRequest():
     
 @app.route('/addExistingList', methods=['POST'])
 def addExistingList():
-    key = request.form['listKey']
+    if (len(request.form) != 0):
+        key = request.form['listKey']
+    else:
+        data = request.get_json()
+        key = data['listKey']
+    
     cursor = get_cursor()
     cursor.execute("SELECT * FROM UserList WHERE name = ? AND list_key = ?",(session['username'],key))
     list = cursor.fetchone()
@@ -464,8 +514,12 @@ def addExistingList():
             print(e)
         finally:
             cursor.close()
-        session['message'] = 'List ' + response_data["list"] + ' added!'
-        return redirect(url_for('list_page', key=key))
+        
+        if (len(request.form) != 0):
+            session['message'] = 'List ' + response_data["list"] + ' added!'
+            return redirect(url_for('list_page', key=key))
+        else:
+            return "added", 200
     session['message'] = 'Could not add List'
     return redirect(url_for('user_page'))
 
@@ -627,6 +681,7 @@ def update_item_serverRequest():
             change = userCRDT.quantityChange(serverCRDT)
             updateItemsQuantities(key,change)
             userCRDT.merge(serverCRDT)
+            print(serverCRDT.inc,serverCRDT.dec)
             updateDBDicts(key,userCRDT)
 
     except Exception as e:

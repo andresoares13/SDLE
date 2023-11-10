@@ -153,6 +153,33 @@ def add_user_route():
 
     return "User added on the server", 200
 
+
+@app.route('/add_existing_user', methods=['POST'])
+def add_existing_user_route():
+    data = request.get_json()
+    name = data['name']
+    password = data['password']
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM User WHERE name = ? AND password = ?", (name, password))
+        user = cursor.fetchone()
+        if user:
+            cursor.execute("SELECT list_key from UserList WHERE name = ?",(name,))
+            lists = cursor.fetchall()
+            listsKeys = []
+            for list in lists:
+                listsKeys.append(list[0])
+
+            response_data = {"lists": listsKeys}
+            response_json = json.dumps(response_data)
+            return response_json, 200
+        else:
+            return "User not found", 404
+    finally:
+        db.close()
+
+
 @app.route('/deleteUser', methods=['POST'])
 def delete_user():
     data = request.get_json()
