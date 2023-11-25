@@ -4,12 +4,15 @@ import requests
 import string
 import random
 import json
+import os
 from crdt import CRDT
 from copy import deepcopy
 
 app = Flask(__name__)
 
 DATABASE_FILE = "server.db"
+
+servers = ["http://localhost:5000", "http://localhost:5001","http://localhost:5002"]
 
 
 
@@ -203,8 +206,13 @@ def add_list_route():
     name = data['name']
     password = data['key']
     user = data['user']
+    servers = data['servers']
 
-    validKey = False
+    if (data['correctKey'] == 0):
+        validKey = False
+    else:
+        validKey = True
+    
 
     while not validKey:
         db = get_db()
@@ -230,12 +238,34 @@ def add_list_route():
             (item[2],item[1], 0))
             cursor.execute("INSERT INTO ItemDecreaseDict (list_key, item, quantity) VALUES (?, ?, ?)", 
             (item[2],item[1], 0))
+        for server in servers:
+            cursor.execute("INSERT INTO ServerListAssign (server, list_key) VALUES (?,?)",(server,password))
+        
+
+
         db.commit()
     finally:
         db.close()
 
     return password, 200
 
+
+@app.route('/deleteListLB',methods=['POST'])
+def addDeleteLB():
+    data = request.get_json()
+    key = data['key']
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('PRAGMA foreign_keys = ON')
+        cursor.execute("DELETE FROM List WHERE password = ?", (key,))
+        conn.commit()
+    except:
+        return "Could not Update", 404
+    finally:
+        cursor.close()
+    
+    return "List deleted", 200
 
 @app.route('/deleteListUpdate', methods=['POST'])
 def addDeleteListUpdate():
@@ -325,7 +355,7 @@ def itemsChange():
                 cursor.execute("SELECT name FROM UserList WHERE list_key = ?",(key,))
                 users = cursor.fetchall()
                 for username in users:
-                    if username[0] != user and not existsItemUpdate(username[0],item[0],item[1],cursor):
+                    if not existsItemUpdate(username[0],item[0],item[1],cursor):
                         cursor.execute("INSERT INTO ItemChangeUpdate (username, list_key, item) VALUES (?, ?, ?)", 
                         (username[0], key,item[1]))
             get_db().commit()
@@ -380,7 +410,6 @@ def requestUpdates():
         return "Failure",404
     else:
         if (itemUpdates):
-            #cursor.execute("DELETE FROM ItemChangeUpdate WHERE username = ?",(username,))
             get_db().commit()
 
         return "Updated", 200
@@ -388,4 +417,12 @@ def requestUpdates():
     
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    folder_name = os.path.basename(script_directory)
+    if (folder_name == 'server1'):
+        port = 5000
+        id = 1
+    else:
+        port = 5001
+        id = 2
+    app.run(debug=True, port=port)

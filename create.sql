@@ -62,6 +62,23 @@ CREATE TABLE ItemDecreaseDict(
     FOREIGN KEY (username) REFERENCES User(name) ON DELETE CASCADE
 );
 
+CREATE TABLE ServerListAssign(
+    server INTEGER,
+    list_key TEXT,
+    FOREIGN KEY (list_key) REFERENCES List(password) ON DELETE CASCADE
+);
+
+
+CREATE TABLE ServerItemChangeUpdate(
+    server INTEGER,
+    list_key TEXT,
+    FOREIGN KEY (list_key) REFERENCES List(password) ON DELETE CASCADE
+);
+
+
+
+
+
 
 
 
