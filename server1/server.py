@@ -112,6 +112,38 @@ def index():
     return render_template('server.html', lists=lists)
 
 
+@app.route('/update_list', methods=['POST'])
+def receive_list_update():
+    data = request.get_json()
+    name = data['name']
+    password = data['key']
+    user = data['user']
+    servers = data['servers']
+
+
+@app.route('/update_user', methods=['POST'])
+def receive_user_update():
+    data = request.get_json()
+    name = data['name']
+    password = data['password']
+     # Insert the user into the server's database
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("INSERT INTO User (name, password) VALUES (?, ?)", (name, password))
+    db.commit()
+
+
+def send_user_update():
+    data = {'name': 'value', 'password': 'value'}
+    response = request.post('url/update', json=data)
+    print(f"Response from server: {response.txt}")
+
+def send_list_update():
+    data = {'name': 'value', 'password': 'value'}
+    response = request.post('url/update', json=data)
+    print(f"Response from server: {response.txt}")
+
+
 @app.route('/create_user', methods=['POST'])
 def create_user():
     data = request.get_json()
