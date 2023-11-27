@@ -18,4 +18,10 @@ run_in_terminal "Client 2" "cd client2 && python3 client.py; read"
 # Open a terminal in /server and run server.py
 run_in_terminal "Server" "cd server1 && python3 server.py; read"
 
+# Open a terminal in /server and run server.py
+run_in_terminal "Server" "cd server2 && python3 server.py; read"
+
+# Open a terminal in /server and run server.py
+run_in_terminal "Server" "cd server3 && python3 server.py; read"
+
 run_in_terminal "Load Balancer" "cd loadBalancer && python3 loadBalancer.py; read"

@@ -433,10 +433,11 @@ def shareList():
     data = {'name':name,'user':session['username'],'key':key,'items': items}
     response = callLB("/add_list",data)
     if response.status_code == 200:
+        response_data = json.loads(response.text)
         try:
             cursor = get_cursor()
-            cursor.execute("UPDATE List SET password = ?, shared = 1 WHERE name = ?", (response.text, name))
-            cursor.execute("UPDATE UserList SET list_key = ? WHERE name = ? AND list_key = ?", (response.text, session['username'], key))
+            cursor.execute("UPDATE List SET password = ?, shared = 1 WHERE name = ?", (response_data['text'], name))
+            cursor.execute("UPDATE UserList SET list_key = ? WHERE name = ? AND list_key = ?", (response_data['text'], session['username'], key))
             for item in items:
                 cursor.execute("INSERT INTO ItemIncreaseDict (username, list_key, item, quantity) VALUES (?, ?, ?, ?)", 
                 (session['username'], item[2],item[1], 0))
@@ -446,7 +447,7 @@ def shareList():
         finally:
             cursor.close()
         session['message'] = 'List ' + name + ' can now be shared!'
-        return redirect(url_for('list_page', key=response.text))
+        return redirect(url_for('list_page', key=response_data['text']))
     else:
         session['message'] = 'List ' + name + ' could not be shared'
         return redirect(url_for('list_page', key=key))

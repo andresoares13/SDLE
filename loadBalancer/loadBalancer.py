@@ -70,17 +70,16 @@ def find_server():
             if (response.status_code != 200):
                 correct = False
                 break
-        
         if (correct):
             cursor = get_cursor()
             for server in serverList:
-                cursor.execute("INSERT INTO ServerListAssign (server, list_key) VALUES (?,?)",(server,data['key']))
+                cursor.execute("INSERT INTO ServerListAssign (server, list_key) VALUES (?,?)",(server,jsonData['key']))
             get_db().commit()
             return response_json, response.status_code
         else:
             for server in serverList:
                 port = list(servers)[server-1]
-                tempData = {'key':data['key']}
+                tempData = {'key':jsonData['key']}
                 tempRoute = "/deleteListLB"
                 response = requests.post(f"{port}{tempRoute}", json=tempData)
             return response_json, 404
