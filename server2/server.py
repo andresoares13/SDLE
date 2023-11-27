@@ -8,13 +8,85 @@ import os
 from crdt import CRDT
 from copy import deepcopy
 
+
+import threading
+import time
+
 app = Flask(__name__)
 
 DATABASE_FILE = "server.db"
 
 servers = ["http://localhost:5000", "http://localhost:5001","http://localhost:5002"]
 
+received_updates = []
+other_servers = ["http://localhost:5000","http://localhost:5002"]
 
+def send_user_update():
+    data = {'name': 'value', 'password': 'value'}
+    response = request.post('url/update', json=data)
+    print(f"Response from server: {response.txt}")
+
+def send_list_update():
+    data = {'name': 'value', 'password': 'value'}
+    response = request.post('url/update', json=data)
+    print(f"Response from server: {response.txt}")
+
+def apply_update_locally(update):
+    list_key = update.get('list_key')
+    items = update.get('items', [])
+
+    # Retrieve the CRDT for the specified list
+    cursor = get_db().cursor()
+    server_crdt = getCRDT(list_key, cursor)
+
+    # Apply the update to the CRDT
+    for item_update in items:
+        item = item_update['item']
+        increase = item_update['increase']
+        decrease = item_update['decrease']
+
+        server_crdt.inc[item] += increase
+        server_crdt.dec[item] += decrease
+
+    # Update the local database with the new CRDT state
+    updateItemsQuantities(list_key, server_crdt.quantityChange(CRDT(list_key, [])), cursor)
+    updateDBDicts(list_key, server_crdt, cursor)
+    get_db().commit()
+
+def send_update_to_other_servers(update):
+    for server in other_servers:
+        try:
+            requests.post(f"{server}/update", json=update)
+        except requests.RequestException as e:
+            print(f"Error sending update to {server}: {e}")
+
+def get_db():
+    db = getattr(g, '_database', None)
+    if db is None:
+        db = g._database = sqlite3.connect(DATABASE_FILE)
+        db.row_factory = sqlite3.Row  # Enable row_factory to work with rows as dictionaries
+    return db
+
+def send_update_to_other_servers(update):
+    for server in other_servers:
+        try:
+            requests.post(f"{server}/update", json=update)
+        except requests.RequestException as e:
+            print(f"Error sending update to {server}: {e}")
+
+def check_for_updates_from_other_servers():
+    while True:
+        for server in other_servers:
+            try:
+                response = requests.get(f"{server}/get_updates")
+                if response.status_code == 200 and response.text:  # Check for a successful response and non-empty content
+                    updates = response.json().get("updates", [])
+                    # Process updates
+                else:
+                    print(f"Unexpected response from {server}: {response.status_code} - {response.text}")
+            except requests.RequestException as e:
+                print(f"Error checking for updates from {server}: {e}")
+        time.sleep(5)
 
 # Function to get a new database connection
 def get_db():
@@ -131,18 +203,6 @@ def receive_user_update():
     cursor = db.cursor()
     cursor.execute("INSERT INTO User (name, password) VALUES (?, ?)", (name, password))
     db.commit()
-
-
-def send_user_update():
-    data = {'name': 'value', 'password': 'value'}
-    response = request.post('url/update', json=data)
-    print(f"Response from server: {response.txt}")
-
-def send_list_update():
-    data = {'name': 'value', 'password': 'value'}
-    response = request.post('url/update', json=data)
-    print(f"Response from server: {response.txt}")
-
 
 @app.route('/create_user', methods=['POST'])
 def create_user():
@@ -461,4 +521,13 @@ if __name__ == '__main__':
     elif(folder_name == 'server3'):
         port=5002
         id = 3
+
+    # Start a thread for checking updates from other servers
+    update_checker_thread = threading.Thread(target=check_for_updates_from_other_servers)
+    update_checker_thread.start()
+
+
+
+
     app.run(debug=True, port=port)
+
