@@ -15,7 +15,7 @@ app.secret_key = 'order66'
 
 DATABASE_FILE = "client.db"
 
-SERVER_URL = "http://localhost:5000" 
+LB_URLS = ["http://localhost:7000", "http://localhost:7001","http://localhost:7002"]
 
 session = {}
 
@@ -34,6 +34,25 @@ def get_db():
 
 def get_cursor():
     return get_db().cursor()
+
+def callLB(route, data):
+    response = None
+    fullRequest = {}
+    fullRequest[route] = data
+    for lb in LB_URLS:
+        try:
+            response = requests.post(f"{lb}/findServer", json=fullRequest)
+            response_data = json.loads(response.text)
+            print(response_data["text"],response_data["status"])
+            break
+        except Exception as e:
+            print(e)
+            continue
+
+    return response
+
+    
+
 
 @app.teardown_appcontext
 def close_db(exception):
@@ -143,7 +162,7 @@ def updateDBDicts(list,crdt):
 def add_user(name, password):
     hashed_password = hash_password(password)
     data = {'name': name, 'password': hashed_password}
-    response = requests.post(f"{SERVER_URL}/add_user", json=data)
+    response = callLB("/add_user",data)
     if response.status_code == 200:
         cursor = get_cursor()
         cursor.execute("INSERT INTO User (name, password) VALUES (?, ?)", (name, hashed_password))
@@ -166,7 +185,7 @@ def add_existing_user():
     password = request.form['password']
     hashed_password = hash_password(password)
     data = {'name': name, 'password': hashed_password}
-    response = requests.post(f"{SERVER_URL}/add_existing_user", json=data)
+    response = callLB("/add_existing_user",data)
     if response.status_code == 200:
         response_data = json.loads(response.text)
         lists = response_data["lists"]
@@ -251,7 +270,7 @@ def sendUpdates():
     listDeleteUpdates = cursor.fetchall()
     for update in listDeleteUpdates:
         data = {'name':update[0],'key':update[1]}
-        response = requests.post(f"{SERVER_URL}/deleteListUpdate", json=data)
+        response = callLB("/deleteListUpdate",data)
         if response.status_code == 200:
             try:
                 cursor.execute("DELETE FROM ListDeleteUpdate WHERE username = ? AND list_key = ?", (update[0], update[1]))
@@ -277,7 +296,7 @@ def sendUpdates():
                 items[update[0]].append([update[0],update[1],increase,decrease])
             
         itemsData = {'name':session['username'],'items':items}
-        response = requests.post(f"{SERVER_URL}/itemsChangeUpdate", json=itemsData)
+        response = callLB("/itemsChangeUpdate",itemsData)
         if response.status_code == 200:
             try:
                 cursor.execute("DELETE FROM ItemChangeUpdate WHERE username = ?", (session['username'],))
@@ -294,7 +313,7 @@ def sendUpdates():
 def receiveUpdates():
     allReceived = True
     data = {'name':session['username'],'port':port}
-    response = requests.post(f"{SERVER_URL}/requestUpdates", json=data)
+    response = callLB("/requestUpdates",data)
     if response.status_code != 200:
         allReceived = False
     return allReceived
@@ -311,7 +330,7 @@ def sync():
     username = session['username']
     hashed = session['hash']
     data = {'name': username, 'password': hashed}
-    response = requests.post(f"{SERVER_URL}/sync", json=data)
+    response = callLB("/sync",data)
     if response.status_code == 200:
         if sendUpdates() and receiveUpdates():
             session['message'] = 'Sucessfully Synced!'
@@ -349,7 +368,7 @@ def delete_user():
     if 'username' in session:
         username = session['username']  
         data = {'username': username}
-        response = requests.post(f"{SERVER_URL}/deleteUser", json=data)
+        response = callLB("/deleteUser",data)
         if response.status_code == 200:
             session.pop('username', None)
             cursor = get_cursor()
@@ -412,12 +431,13 @@ def shareList():
     if not items:
         items = []
     data = {'name':name,'user':session['username'],'key':key,'items': items}
-    response = requests.post(f"{SERVER_URL}/add_list", json=data)
+    response = callLB("/add_list",data)
     if response.status_code == 200:
+        response_data = json.loads(response.text)
         try:
             cursor = get_cursor()
-            cursor.execute("UPDATE List SET password = ?, shared = 1 WHERE name = ?", (response.text, name))
-            cursor.execute("UPDATE UserList SET list_key = ? WHERE name = ? AND list_key = ?", (response.text, session['username'], key))
+            cursor.execute("UPDATE List SET password = ?, shared = 1 WHERE name = ?", (response_data['text'], name))
+            cursor.execute("UPDATE UserList SET list_key = ? WHERE name = ? AND list_key = ?", (response_data['text'], session['username'], key))
             for item in items:
                 cursor.execute("INSERT INTO ItemIncreaseDict (username, list_key, item, quantity) VALUES (?, ?, ?, ?)", 
                 (session['username'], item[2],item[1], 0))
@@ -427,7 +447,7 @@ def shareList():
         finally:
             cursor.close()
         session['message'] = 'List ' + name + ' can now be shared!'
-        return redirect(url_for('list_page', key=response.text))
+        return redirect(url_for('list_page', key=response_data['text']))
     else:
         session['message'] = 'List ' + name + ' could not be shared'
         return redirect(url_for('list_page', key=key))
@@ -484,7 +504,7 @@ def addExistingList():
     cursor.close()
 
     data = {'key': key,'user':session['username']}
-    response = requests.post(f"{SERVER_URL}/add_existingList", json=data)
+    response = callLB("/add_existingList",data)
     if response.status_code == 200:
         try:
             cursor = get_cursor()
