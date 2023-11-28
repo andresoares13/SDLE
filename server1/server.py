@@ -112,13 +112,44 @@ def index():
     return render_template('server.html', lists=lists)
 
 
+######################################################################################################################################################################################
+
 @app.route('/update_list', methods=['POST'])
 def receive_list_update():
     data = request.get_json()
-    name = data['name']
-    password = data['key']
+    lst = data["list"] 
+    incDic = data['incDic'] 
+    decDic = data['decDic']
+    password = lst['password']
+    name = lst['name']
     user = data['user']
-    servers = data['servers']
+
+    db = get_db()
+    cursor = db.cursor()
+
+    # Check if list to be updated already exists and add new one if it doesn't
+    cursor.execute("SELECT name FROM List WHERE password = ?", (password))
+    exists = cursor.fetchone()
+    if (exists == None): 
+        try:
+            cursor.execute("INSERT INTO List (name, password) VALUES (?, ?)", (name, password))
+            cursor.execute("INSERT INTO UserList (name, list_key) VALUES (?, ?)", (user, password))
+            for item in data['items']:
+                cursor.execute("INSERT INTO Item (name, list_key, quantity) VALUES (?, ?, ?)", (item[1], item[2], item[3]))
+                cursor.execute("INSERT INTO ItemIncreaseDict (list_key, item, quantity) VALUES (?, ?, ?)", 
+                (item[2],item[1], 0))
+                cursor.execute("INSERT INTO ItemDecreaseDict (list_key, item, quantity) VALUES (?, ?, ?)", 
+                (item[2],item[1], 0))
+            for server in servers:
+                cursor.execute("INSERT INTO ServerListAssign (server, list_key) VALUES (?,?)",(server,password))
+            db.commit()
+        finally:
+            db.close()
+
+    # merge the changes with the new list
+
+
+    return "Lists Updated", 200
 
 
 @app.route('/update_user', methods=['POST'])
@@ -126,22 +157,51 @@ def receive_user_update():
     data = request.get_json()
     name = data['name']
     password = data['password']
-     # Insert the user into the server's database
+    # Insert the user into the server's database
     db = get_db()
     cursor = db.cursor()
     cursor.execute("INSERT INTO User (name, password) VALUES (?, ?)", (name, password))
     db.commit()
+    return "User Added", 200
 
 
-def send_user_update():
-    data = {'name': 'value', 'password': 'value'}
-    response = request.post('url/update', json=data)
+def send_user_update(url, name, password):
+    data = {'name': name, 'password': password}
+    response = request.post(url+'/update_user', json=data)
     print(f"Response from server: {response.txt}")
 
-def send_list_update():
-    data = {'name': 'value', 'password': 'value'}
-    response = request.post('url/update', json=data)
+
+def send_list_update(url, key):
+    data = {'list_key': key}
+    # Add increase and decrease dictionaries to data to be sent
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM ItemIncreaseDict WHERE list_key = ? ", (key))
+    incDic = cursor.fetchone()
+
+    cursor.execute("SELECT * FROM ItemDecreaseDict WHERE list_key = ? ", (key))
+    decDic = cursor.fetchone()
+
+    cursor.execute("SELECT * FROM List WHERE password = ?", (key))
+    lst = cursor.fetchone()
+
+    cursor.execute("SELECT name FROM UserList WHERE list_key = ?", (key))
+    user = cursor.fetchone()
+
+    data['incDic'] = incDic
+    data['decDic'] = decDic
+    data['list'] = lst
+    data['user'] = user
+
+    print(data)
+
+    response = request.post(url+'/update_list', json=data)
     print(f"Response from server: {response.txt}")
+
+
+######################################################################################################################################################################################
+
+
 
 
 @app.route('/create_user', methods=['POST'])
@@ -155,6 +215,10 @@ def create_user():
     cursor = db.cursor()
     cursor.execute("INSERT INTO User (name, password) VALUES (?, ?)", (name, password))
     db.commit()
+
+    for server in servers:
+        send_user_update(server, name, password)
+
     return "User created on the server"
 
 @app.route('/sync', methods=['POST'])
@@ -451,14 +515,10 @@ def requestUpdates():
 if __name__ == '__main__':
     script_directory = os.path.dirname(os.path.abspath(__file__))
     folder_name = os.path.basename(script_directory)
-    
     if (folder_name == 'server1'):
         port = 5000
         id = 1
-    elif(folder_name == 'server2'):
+    else:
         port = 5001
         id = 2
-    elif(folder_name == 'server3'):
-        port=5002
-        id = 3
     app.run(debug=True, port=port)
