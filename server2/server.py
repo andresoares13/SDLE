@@ -1,4 +1,4 @@
-from flask import Flask, request, g, render_template
+from flask import Flask, request, g, render_template, current_app
 import sqlite3
 import requests
 import string
@@ -7,12 +7,15 @@ import json
 import os
 from crdt import CRDT
 from copy import deepcopy
+import threading
+import time
 
 app = Flask(__name__)
 
 DATABASE_FILE = "server.db"
 
 servers = ["http://localhost:5000", "http://localhost:5001","http://localhost:5002"]
+
 
 
 
@@ -112,44 +115,51 @@ def index():
     return render_template('server.html', lists=lists)
 
 
-######################################################################################################################################################################################
+def check_for_updates_from_other_servers():
+    time.sleep(10)
+    with app.app_context():
+        servers = ["http://localhost:5000", "http://localhost:5001","http://localhost:5002"]
+        while True:
+            conn = get_db()
+            cursor = conn.cursor()
+            if (id == 1):
+                id2 = 2
+                id3 = 3
+            elif (id == 10):
+                id2 = 8
+                id3 = 9
+            else:
+                id2 = id - 1
+                id3 = id + 1
+            for server in range(len(servers)):
+                if (id - 1 != server):
+                    try:
+                        cursor.execute("SELECT * FROM ServerListChangeUpdate WHERE server = ?",(server + 1,))
+                        
+                        list_updates = cursor.fetchall()
+                        for update in list_updates:
+                            cursor.execute("SELECT * FROM Item where list_key = ?",(update[1],))
+                            items = cursor.fetchall()
+                            if not items:
+                                items = []
+                            cursor.execute("SELECT name FROM UserList WHERE list_key = ?",(update[1],))
+                            name = cursor.fetchone()
+                            cursor.execute("SELECT name FROM List WHERE password = ?",(update[1],))
+                            listName = cursor.fetchone()
+                            serverIds = [id,id2,id3]
+                            data = {'name':listName[0],'user':name[0],'key':update[1],'items': items,'servers': serverIds,'correctKey': 1,'postUpdate': 0}
+                            response = requests.post(f"{servers[server]}/add_list",json=data)
+                            if response.status_code == 200:
+                                cursor.execute("DELETE FROM ServerListChangeUpdate WHERE server = ?", (server + 1,))
+                                conn.commit()
+                                
 
-@app.route('/update_list', methods=['POST'])
-def receive_list_update():
-    data = request.get_json()
-    lst = data["list"] 
-    incDic = data['incDic'] 
-    decDic = data['decDic']
-    password = lst['password']
-    name = lst['name']
-    user = data['user']
-
-    db = get_db()
-    cursor = db.cursor()
-
-    # Check if list to be updated already exists and add new one if it doesn't
-    cursor.execute("SELECT name FROM List WHERE password = ?", (password))
-    exists = cursor.fetchone()
-    if (exists == None): 
-        try:
-            cursor.execute("INSERT INTO List (name, password) VALUES (?, ?)", (name, password))
-            cursor.execute("INSERT INTO UserList (name, list_key) VALUES (?, ?)", (user, password))
-            for item in data['items']:
-                cursor.execute("INSERT INTO Item (name, list_key, quantity) VALUES (?, ?, ?)", (item[1], item[2], item[3]))
-                cursor.execute("INSERT INTO ItemIncreaseDict (list_key, item, quantity) VALUES (?, ?, ?)", 
-                (item[2],item[1], 0))
-                cursor.execute("INSERT INTO ItemDecreaseDict (list_key, item, quantity) VALUES (?, ?, ?)", 
-                (item[2],item[1], 0))
-            for server in servers:
-                cursor.execute("INSERT INTO ServerListAssign (server, list_key) VALUES (?,?)",(server,password))
-            db.commit()
-        finally:
-            db.close()
-
-    # merge the changes with the new list
+                
+                    except requests.RequestException as e:
+                        print(f"Error checking for updates from {server}: {e}")
+            time.sleep(300)
 
 
-    return "Lists Updated", 200
 
 
 @app.route('/update_user', methods=['POST'])
@@ -169,38 +179,6 @@ def send_user_update(url, name, password):
     data = {'name': name, 'password': password}
     response = request.post(url+'/update_user', json=data)
     print(f"Response from server: {response.txt}")
-
-
-def send_list_update(url, key):
-    data = {'list_key': key}
-    # Add increase and decrease dictionaries to data to be sent
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT * FROM ItemIncreaseDict WHERE list_key = ? ", (key))
-    incDic = cursor.fetchone()
-
-    cursor.execute("SELECT * FROM ItemDecreaseDict WHERE list_key = ? ", (key))
-    decDic = cursor.fetchone()
-
-    cursor.execute("SELECT * FROM List WHERE password = ?", (key))
-    lst = cursor.fetchone()
-
-    cursor.execute("SELECT name FROM UserList WHERE list_key = ?", (key))
-    user = cursor.fetchone()
-
-    data['incDic'] = incDic
-    data['decDic'] = decDic
-    data['list'] = lst
-    data['user'] = user
-
-    print(data)
-
-    response = request.post(url+'/update_list', json=data)
-    print(f"Response from server: {response.txt}")
-
-
-######################################################################################################################################################################################
-
 
 
 
@@ -308,8 +286,13 @@ def add_list_route():
         validKey = False
     else:
         validKey = True
-    
 
+    
+    if (data['postUpdate'] == 0):
+        postUpdate = True
+    else:
+        postUpdate = False
+    
     while not validKey:
         db = get_db()
         cursor = db.cursor()
@@ -334,8 +317,11 @@ def add_list_route():
             (item[2],item[1], 0))
             cursor.execute("INSERT INTO ItemDecreaseDict (list_key, item, quantity) VALUES (?, ?, ?)", 
             (item[2],item[1], 0))
+        
         for server in servers:
             cursor.execute("INSERT INTO ServerListAssign (server, list_key) VALUES (?,?)",(server,password))
+            if (server != id and not postUpdate):
+                cursor.execute("INSERT INTO ServerListChangeUpdate (server, list_key) VALUES (?,?)",(server,password))
         
 
 
@@ -518,7 +504,13 @@ if __name__ == '__main__':
     if (folder_name == 'server1'):
         port = 5000
         id = 1
-    else:
+    elif (folder_name == 'server2'):
         port = 5001
         id = 2
+    else:
+        port = 5002
+        id = 3
+
+    update_checker_thread = threading.Thread(target=check_for_updates_from_other_servers)
+    update_checker_thread.start()
     app.run(debug=True, port=port)

@@ -69,6 +69,14 @@ CREATE TABLE ServerListAssign(
 );
 
 
+CREATE TABLE ServerListChangeUpdate(
+    server INTEGER,
+    list_key TEXT,
+    FOREIGN KEY (list_key) REFERENCES List(password) ON DELETE CASCADE
+);
+
+
+
 CREATE TABLE ServerItemChangeUpdate(
     server INTEGER,
     list_key TEXT,

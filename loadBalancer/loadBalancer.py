@@ -49,27 +49,25 @@ def find_server():
         serverList = [id,id2,id3]
         
         jsonData['servers'] = serverList
+        jsonData['postUpdate'] = 1
 
         correct = True
         keyDecision = False
 
-        for server in serverList:
 
-            if not keyDecision:  #first server to receive this decides the correct list key
-                jsonData['correctKey'] = 1
-                keyDecision = True
-            else:
-                jsonData['correctKey'] = 0
+        if not keyDecision:  #first server to receive this decides the correct list key
+            jsonData['correctKey'] = 1
+            keyDecision = True
+        else:
+            jsonData['correctKey'] = 0
 
+        response = requests.post(f"{choice}{route}", json=jsonData)
+        responseDic = {"text":response.text, "status":response.status_code} 
+        response_json = json.dumps(responseDic)
 
-            port = list(servers)[server-1]
-            response = requests.post(f"{port}{route}", json=jsonData)
-            responseDic = {"text":response.text, "status":response.status_code} 
-            response_json = json.dumps(responseDic)
-
-            if (response.status_code != 200):
-                correct = False
-                break
+        if (response.status_code != 200):
+            correct = False
+     
         if (correct):
             cursor = get_cursor()
             for server in serverList:
@@ -77,11 +75,6 @@ def find_server():
             get_db().commit()
             return response_json, response.status_code
         else:
-            for server in serverList:
-                port = list(servers)[server-1]
-                tempData = {'key':jsonData['key']}
-                tempRoute = "/deleteListLB"
-                response = requests.post(f"{port}{tempRoute}", json=tempData)
             return response_json, 404
     
     else:
