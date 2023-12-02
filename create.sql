@@ -83,6 +83,13 @@ CREATE TABLE ServerItemChangeUpdate(
     FOREIGN KEY (list_key) REFERENCES List(password) ON DELETE CASCADE
 );
 
+CREATE TABLE ServerUserChangeUpdate(
+    server INTEGER,
+    name TEXT,
+    password TEXT,
+    change INTEGER
+);
+
 
 
 

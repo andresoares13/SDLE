@@ -161,7 +161,7 @@ def updateDBDicts(list,crdt):
 
 def add_user(name, password):
     hashed_password = hash_password(password)
-    data = {'name': name, 'password': hashed_password}
+    data = {'name': name, 'password': hashed_password,'postUpdate':1}
     response = callLB("/add_user",data)
     if response.status_code == 200:
         cursor = get_cursor()
@@ -295,7 +295,7 @@ def sendUpdates():
                 items[update[0]] = []
                 items[update[0]].append([update[0],update[1],increase,decrease])
             
-        itemsData = {'name':session['username'],'items':items}
+        itemsData = {'name':session['username'],'items':items,'client':0}
         response = callLB("/itemsChangeUpdate",itemsData)
         if response.status_code == 200:
             try:
@@ -367,7 +367,7 @@ def add_user_route():
 def delete_user():
     if 'username' in session:
         username = session['username']  
-        data = {'username': username}
+        data = {'username': username,'postUpdate':1}
         response = callLB("/deleteUser",data)
         if response.status_code == 200:
             session.pop('username', None)

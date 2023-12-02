@@ -106,6 +106,23 @@ def existsItemUpdate(user, list, item,cursor):
         return True
     else:
         return False
+    
+
+def existsServerItemUpdate(list,server,cursor):
+    cursor.execute("SELECT * FROM ServerItemChangeUpdate WHERE list_key = ? AND server = ?", (list,server))
+    update = cursor.fetchone()
+    if (update):
+        return True
+    else:
+        return False
+    
+def existsServerUserUpdate(name,server,cursor,change):
+    cursor.execute("SELECT * FROM ServerUserChangeUpdate WHERE name = ? AND server = ? AND change = ?", (name,server,change))
+    update = cursor.fetchone()
+    if (update):
+        return True
+    else:
+        return False
 
 @app.route('/')
 def index():
@@ -134,6 +151,23 @@ def check_for_updates_from_other_servers():
             for server in range(len(servers)):
                 if (id - 1 != server):
                     try:
+                        cursor.execute("SELECT * FROM ServerUserChangeUpdate WHERE server = ?",(server + 1,))
+                        user_updates = cursor.fetchall()
+                        if (user_updates):
+                            for update in user_updates:
+                                if (update[3] == 0):
+                                    data = {'name': update[1],'password':update[2],'postUpdate':0}
+                                    response = requests.post(f"{servers[server]}/add_user",json=data)
+                                    if response.status_code == 200:
+                                        cursor.execute("DELETE FROM ServerUserChangeUpdate WHERE server = ? AND name = ? AND change =?", (server + 1,update[1],0))
+                                        conn.commit()
+                                else:
+                                    data = {'username': update[1],'postUpdate':0}
+                                    response = requests.post(f"{servers[server]}/deleteUser",json=data)
+                                    if response.status_code == 200:
+                                        cursor.execute("DELETE FROM ServerUserChangeUpdate WHERE server = ? AND name = ? AND change =?", (server + 1,update[1],1))
+                                        conn.commit()
+
                         cursor.execute("SELECT * FROM ServerListChangeUpdate WHERE server = ?",(server + 1,))
                         
                         list_updates = cursor.fetchall()
@@ -150,9 +184,34 @@ def check_for_updates_from_other_servers():
                             data = {'name':listName[0],'user':name[0],'key':update[1],'items': items,'servers': serverIds,'correctKey': 1,'postUpdate': 0}
                             response = requests.post(f"{servers[server]}/add_list",json=data)
                             if response.status_code == 200:
-                                cursor.execute("DELETE FROM ServerListChangeUpdate WHERE server = ?", (server + 1,))
+                                cursor.execute("DELETE FROM ServerListChangeUpdate WHERE server = ? AND list_key = ?", (server + 1,update[1]))
                                 conn.commit()
-                                
+
+                        cursor.execute("SELECT * FROM ServerItemChangeUpdate WHERE server = ?",(server + 1,))
+                        item_updates = cursor.fetchall()
+                        if (item_updates):
+                            for update in item_updates:
+                                itemsDic = {}
+                                cursor.execute("SELECT name FROM Item where list_key = ?",(update[1],))
+                                items = cursor.fetchall()
+                                if not items:
+                                    items = []
+                                else:
+                                    for item in items:
+                                        increase = getDictQuantityItem(True,update[1],item[0],cursor)
+                                        decrease = getDictQuantityItem(False,update[1],item[0],cursor)
+                                        if itemsDic.get(update[1]):
+                                            itemsDic[update[1]].append([update[1],item[0],increase,decrease])
+                                        else:
+                                            itemsDic[update[1]] = []
+                                            itemsDic[update[1]].append([update[1],item[0],increase,decrease])
+                                    itemsData = {'items':itemsDic,'client':1}
+                                    response = requests.post(f"{servers[server]}/itemsChangeUpdate",json=itemsData)
+                                    if response.status_code == 200:
+                                        cursor.execute("DELETE FROM ServerItemChangeUpdate WHERE server = ? AND list_key = ?", (server + 1,update[1]))
+                                        conn.commit()
+
+
 
                 
                     except requests.RequestException as e:
@@ -220,10 +279,18 @@ def add_user_route():
     data = request.get_json()
     name = data['name']
     password = data['password']
+    if (data['postUpdate'] == 0):
+        postUpdate = True
+    else:
+        postUpdate = False
     try:
         db = get_db()
         cursor = db.cursor()
         cursor.execute("INSERT INTO User (name, password) VALUES (?, ?)", (name, password))
+        if (not postUpdate):
+            for server in range(len(servers)):
+                if not existsServerUserUpdate(name,server + 1,cursor,0) and server + 1 != id:
+                    cursor.execute("INSERT INTO ServerUserChangeUpdate (server, name, password, change) VALUES (?,?,?,?)",(server + 1,name,password,0))
         db.commit()
     finally:
         db.close()
@@ -263,10 +330,18 @@ def delete_user():
     username = data['username']
     conn = get_db()
     cursor = conn.cursor()
+    if (data['postUpdate'] == 0):
+        postUpdate = True
+    else:
+        postUpdate = False
 
     try:
         cursor.execute('PRAGMA foreign_keys = ON')
         cursor.execute("DELETE FROM User WHERE name = ?", (username,))
+        if (not postUpdate):
+            for server in range(len(servers)):
+                if not existsServerUserUpdate(username,server + 1,cursor,0) and server + 1 != id:
+                    cursor.execute("INSERT INTO ServerUserChangeUpdate (server, name,change) VALUES (?,?,?)",(server + 1,username,1))
         conn.commit()
         conn.close()
         return "User deleted", 200  # Return a success response
@@ -421,7 +496,7 @@ def add_existingList_route():
 def itemsChange():
     data = request.get_json()
     items = data['items']
-    user = data['name']
+    client = data['client']
     try:
         cursor = get_db().cursor()
         for key, value in items.items():
@@ -440,9 +515,17 @@ def itemsChange():
                     if not existsItemUpdate(username[0],item[0],item[1],cursor):
                         cursor.execute("INSERT INTO ItemChangeUpdate (username, list_key, item) VALUES (?, ?, ?)", 
                         (username[0], key,item[1]))
+
             get_db().commit()
 
-            return "Items updated", 200
+        if (client == 0):
+            for server in range(len(servers)):
+                if not existsServerItemUpdate(key,server+1,cursor) and server + 1 != id:
+                    cursor.execute("INSERT INTO ServerItemChangeUpdate (server, list_key) VALUES (?,?)",(server + 1,key))
+            get_db().commit()
+        return "Items updated", 200
+        
+
     except Exception as e:
         print(e)
         return "Item updates not handled correctly", 404 
