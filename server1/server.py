@@ -176,6 +176,8 @@ def check_for_updates_from_other_servers():
                             items = cursor.fetchall()
                             if not items:
                                 items = []
+                            else:
+                                items = [tuple(row) for row in items]
                             cursor.execute("SELECT name FROM UserList WHERE list_key = ?",(update[1],))
                             name = cursor.fetchone()
                             cursor.execute("SELECT name FROM List WHERE password = ?",(update[1],))
