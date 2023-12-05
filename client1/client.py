@@ -515,10 +515,11 @@ def addExistingList():
                 get_db().commit()
             else:
                 response_data = json.loads(response.text)
-                list_value = response_data["list"]
-                items = response_data["items"]
-                inc = response_data["inc"]
-                dec = response_data["dec"]
+                finalResponseData = json.loads(response_data['text'])
+                list_value = finalResponseData["list"]
+                items = finalResponseData["items"]
+                inc = finalResponseData["inc"]
+                dec = finalResponseData["dec"]
                 cursor.execute("INSERT INTO List (name, password,shared) VALUES (?, ? ,?)", (list_value, key,1))
                 cursor.execute("INSERT INTO UserList (name, list_key) VALUES (?, ?)", (session['username'], key))
                 for item in items:
@@ -536,7 +537,7 @@ def addExistingList():
             cursor.close()
         
         if (len(request.form) != 0):
-            session['message'] = 'List ' + response_data["list"] + ' added!'
+            session['message'] = 'List ' + finalResponseData["list"] + ' added!'
             return redirect(url_for('list_page', key=key))
         else:
             return "added", 200
