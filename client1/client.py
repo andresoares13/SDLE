@@ -188,7 +188,9 @@ def add_existing_user():
     response = callLB("/add_existing_user",data)
     if response.status_code == 200:
         response_data = json.loads(response.text)
-        lists = response_data["lists"]
+        finalResponseData = json.loads(response_data['text'])
+        lists = finalResponseData["lists"]
+
         cursor = get_cursor()
         cursor.execute("INSERT INTO User (name, password) VALUES (?, ?)", (name, hashed_password))
         get_db().commit()
