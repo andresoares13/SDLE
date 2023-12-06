@@ -3,6 +3,7 @@ import sys
 import requests
 import json
 import sqlite3
+import time
 
 app = Flask(__name__)
 
@@ -28,11 +29,24 @@ def find_server():
     jsonData = data[route]
     min = sys.maxsize
     choice = None
-    for server, value in servers.items():
-        ratio = value / serversNum
-        if ratio < min:
-            min = ratio
-            choice = server
+    offServers = []
+    while (choice == None):
+        for server, value in servers.items():
+            if (server not in offServers):
+                ratio = value / serversNum
+                if ratio < min:
+                    min = ratio
+                    choice = server
+        try:
+            response = requests.post(f"{choice}/serverOnline")
+            break
+        except Exception as e:
+
+            offServers.append(choice)
+            choice = None
+            min = sys.maxsize
+            
+
 
     if (route == '/add_list'):
         id = list(servers).index(choice) + 1
@@ -76,6 +90,30 @@ def find_server():
             return response_json, response.status_code
         else:
             return response_json, 404
+        
+    elif (route == '/deleteListUpdate'):
+        id = list(servers).index(choice) + 1
+        if (id == 1):
+            id2 = 2
+            id3 = 3
+        elif (id == 10):
+            id2 = 8
+            id3 = 9
+        else:
+            id2 = id - 1
+            id3 = id + 1
+
+        serverList = [id,id2,id3]
+        
+        jsonData['servers'] = serverList
+
+        response = requests.post(f"{choice}{route}", json=jsonData)
+
+        responseDic = {"text":response.text, "status":response.status_code} 
+
+        response_json = json.dumps(responseDic)
+
+        return response_json, response.status_code
     
     else:
 
