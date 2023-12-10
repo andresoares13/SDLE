@@ -672,13 +672,17 @@ def delete_item():
     try:
         cursor = get_cursor()
         cursor.execute("DELETE FROM Item WHERE name = ? and list_key = ?", (item, key))
-        dif = int(quantity) + getDictQuantity(False,key,item,cursor)
-        cursor.execute("UPDATE ItemDecreaseDict SET quantity = ? WHERE username = ? AND list_key = ? AND item = ?",
-        (dif, session['username'], key, item))
+
+        shared = sharedList(key,cursor)
+        if (shared):
+            dif = int(quantity) + getDictQuantity(False,key,item,cursor)
+            cursor.execute("UPDATE ItemDecreaseDict SET quantity = ? WHERE username = ? AND list_key = ? AND item = ?",
+            (dif, session['username'], key, item))
+
         if not existsItemUpdate(key,item,cursor):
             cursor.execute("INSERT INTO ItemChangeUpdate (username, list_key, item) VALUES (?, ?, ?)", 
             (session['username'], key,item))
-        
+
         get_db().commit()
         session['message'] = 'Item deleted successfully!'
         return redirect(url_for('list_page', key=key))
