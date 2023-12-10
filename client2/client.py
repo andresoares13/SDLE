@@ -271,7 +271,7 @@ def sendUpdates():
     cursor.execute("SELECT * FROM ListDeleteUpdate WHERE username = ?",(session['username'],))
     listDeleteUpdates = cursor.fetchall()
     for update in listDeleteUpdates:
-        data = {'name':update[0],'key':update[1]}
+        data = {'name':update[0],'key':update[1],'postUpdate':1}
         response = callLB("/deleteListUpdate",data)
         if response.status_code == 200:
             try:
@@ -341,8 +341,7 @@ def sync():
             session['message'] = 'Sync Failed'
             return redirect(url_for('user_page')) 
     else:
-        session['message'] = 'Sync Failed'
-        return redirect(url_for('user_page'))  
+        return delete_user()
 
 
 
@@ -377,6 +376,7 @@ def delete_user():
             cursor.execute('PRAGMA foreign_keys = ON')
             cursor.execute("DELETE FROM User WHERE name = ?", (username,))
             get_db().commit()
+            session['message'] = 'User was deleted remotely'
             return redirect(url_for('index'))  
     return redirect(url_for('index'))  
 

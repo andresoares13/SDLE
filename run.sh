@@ -24,4 +24,8 @@ run_in_terminal "Server" "cd server2 && python3 server.py; read"
 # Open a terminal in /server and run server.py
 run_in_terminal "Server" "cd server3 && python3 server.py; read"
 
-run_in_terminal "Load Balancer" "cd loadBalancer && python3 loadBalancer.py; read"
+run_in_terminal "Load Balancer" "cd loadBalancer1 && python3 loadBalancer.py; read"
+
+run_in_terminal "Load Balancer" "cd loadBalancer2 && python3 loadBalancer.py; read"
+
+run_in_terminal "Load Balancer" "cd loadBalancer3 && python3 loadBalancer.py; read"

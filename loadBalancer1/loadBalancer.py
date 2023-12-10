@@ -3,7 +3,7 @@ import sys
 import requests
 import json
 import sqlite3
-import time
+import os
 
 app = Flask(__name__)
 
@@ -127,4 +127,12 @@ def find_server():
         return response_json, response.status_code
 
 if __name__ == '__main__':
-    app.run(debug=True, port=7000)
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    folder_name = os.path.basename(script_directory)
+    if (folder_name == 'loadBalancer1'):
+        port = 7000
+    elif (folder_name == 'loadBalancer2'):
+        port = 7001
+    else:
+        port = 7002
+    app.run(debug=True, port=port)
